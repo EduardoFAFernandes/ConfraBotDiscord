@@ -1,23 +1,41 @@
 import discord
 import os
+import random
+
+from discord.ext import commands
 
 BOT_PROMPT = "$"
 
-client = discord.Client()
+bot = commands.Bot(command_prefix=BOT_PROMPT)
 
-@client.event
+@bot.event
 async def on_ready():
-    print('We have logged in as {0.user}'.format(client))
+    print('Logged in as')
+    print(bot.user.name)
+    print(bot.user.id)
+    print('------')
 
-@client.event
-async def on_message(message):
-    if message.author == client.user:
+
+@bot.command()
+async def roll(ctx, dice: str):
+    """Rolls a dice in NdN format."""
+    try:
+        rolls, limit = map(int, dice.split('d'))
+    except Exception:
+        await ctx.send('Format has to be in NdN!')
         return
 
-    if message.content.startswith(f'{BOT_PROMPT}hello'):
-        await message.channel.send('Hello!')
+    result = ', '.join(str(random.randint(1, limit)) for r in range(rolls))
+    await ctx.send(result)
+
+@bot.command()
+async def hello(ctx):
+    """Greets a user"""
+    
+    result = f'Hello {ctx.author.mention}!'
+    await ctx.send(result)
 
 
 if __name__ == "__main__":
     DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-    client.run(DISCORD_TOKEN)
+    bot.run(DISCORD_TOKEN)
