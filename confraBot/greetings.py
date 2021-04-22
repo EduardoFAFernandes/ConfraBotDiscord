@@ -13,7 +13,7 @@ class Greetings(commands.Cog):
         """Says hello"""
         member = member or ctx.author
         if self._last_member is None or self._last_member.id != member.id:
-            await ctx.send('Hello {0.name}~'.format(member))
+            await ctx.send(f'Hello {member.name}')
         else:
-            await ctx.send('Hello {0.name}... This feels familiar.'.format(member))
+            await ctx.send(f'Hello {member.name}... This feels familiar.')
         self._last_member = member
