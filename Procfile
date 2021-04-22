@@ -1,1 +1,1 @@
-worker: python confraBot/main.py
+worker: python main.py
