@@ -4,9 +4,17 @@ import random
 
 from discord.ext import commands
 
+from confraBot import greetings
+
 BOT_PROMPT = "$"
 
 bot = commands.Bot(command_prefix=BOT_PROMPT)
+bot_cogs = [
+    greetings.Greetings]
+
+for cog in bot_cogs:
+    bot.add_cog(cog(bot))
+
 
 @bot.event
 async def on_ready():
@@ -26,13 +34,6 @@ async def roll(ctx, dice: str):
         return
 
     result = ', '.join(str(random.randint(1, limit)) for r in range(rolls))
-    await ctx.send(result)
-
-@bot.command()
-async def hello(ctx):
-    """Greets a user"""
-    
-    result = f'Hello {ctx.author.mention}!'
     await ctx.send(result)
 
 
