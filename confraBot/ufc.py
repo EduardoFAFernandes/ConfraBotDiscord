@@ -100,13 +100,16 @@ def parse_fights(fights_data):
 
 
 def parse_fighter(fighter):
+    try:
+        rank = fighter.select_one(".js-listing-fight__corner-rank > span").contents[0]
+    except Exception:
+        rank = "U"
+
     return dict(
-        color=None,
         first_name=fighter.find(class_="c-listing-fight__corner-given-name").contents[0],
         last_name=fighter.find(class_="c-listing-fight__corner-family-name").contents[0],
-        rank=fighter.select_one(".js-listing-fight__corner-rank > span").contents[0],
+        rank=rank,
     )
-
 
 if __name__ == "__main__":
     pass
