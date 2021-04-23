@@ -20,6 +20,21 @@ def get_latest_event_url():
     return card_url
 
 
+def get_event_details(card_url):
+    event_content = requests.get(card_url, **ufc_request_details()).content
+
+    event_page = BeautifulSoup(event_content, 'html.parser')
+    result = dict(
+        url=card_url,
+        name=event_page.select_one(".field--name-node-title > h1").contents[0].strip(),
+        image=event_page.find(class_="c-hero__image")["src"].split("?")[0],
+        timestamp=event_page.find(class_="c-event-fight-card-broadcaster__time")["data-timestamp"],
+        main_card_fights=parse_fights(event_page.find(id="edit-group-main-card")
+                                      .find_all(class_="c-listing-fight"))
+    )
+
+    return result
+
 
 def ufc_request_details():
     cookies = {
@@ -41,6 +56,27 @@ def ufc_request_details():
         'accept-language': 'pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7',
     }
     return dict(cookies=cookies, headers=headers)
+
+
+def parse_fights(fights_data):
+    fights = [
+        dict(red_fighter=parse_fighter(fight_data.find(class_="c-listing-fight__corner--red")),
+             blue_fighter=parse_fighter(fight_data.find(class_="c-listing-fight__corner--blue")),
+             fight_class=fight_data.find(class_="c-listing-fight__class").contents[0])
+        for fight_data in fights_data
+    ]
+
+    return fights
+
+
+def parse_fighter(fighter):
+    return dict(
+        color=None,
+        first_name=fighter.find(class_="c-listing-fight__corner-given-name").contents[0],
+        last_name=fighter.find(class_="c-listing-fight__corner-family-name").contents[0],
+        rank=fighter.select_one(".js-listing-fight__corner-rank > span").contents[0],
+    )
+
 
 if __name__ == "__main__":
     pass
