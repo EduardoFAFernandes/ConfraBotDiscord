@@ -1,6 +1,9 @@
+import datetime
+
 import requests
 from bs4 import BeautifulSoup
 
+import discord
 from discord.ext import commands
 
 
@@ -8,6 +11,33 @@ class UFC(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
+
+    @commands.command()
+    async def ufc_card(self, ctx):
+
+        event_details = get_event_details(get_latest_event_url())
+
+        embed = discord.Embed(title=event_details["name"],
+                              url=event_details["url"],
+                              description=datetime.datetime.fromtimestamp(int(event_details["timestamp"]))
+                                          .strftime("%A %d %B %H:%M"),
+                              color=0xdedede)
+
+        embed.set_image(url=event_details["image"])
+
+        for fight in event_details["main_card_fights"]:
+            red_fighter_description = f"{fight['red_fighter']['rank']} " \
+                                      f"{fight['red_fighter']['first_name']} " \
+                                      f"{fight['red_fighter']['last_name']}"
+            blue_fighter_description = f"{fight['blue_fighter']['rank']} " \
+                                       f"{fight['blue_fighter']['first_name']} " \
+                                       f"{fight['blue_fighter']['last_name']}"
+            fight_description = f"{red_fighter_description} vs. {blue_fighter_description}"
+            embed.add_field(name=fight_description,
+                            value=fight["fight_class"],
+                            inline=False)
+        await ctx.send(embed=embed)
+
 
 def get_latest_event_url():
     ufc_url = "https://www.ufc.com"
