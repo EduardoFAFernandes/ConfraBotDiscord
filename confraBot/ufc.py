@@ -9,12 +9,23 @@ from discord.ext import commands
 
 
 class UFC(commands.Cog):
+    """
+    This is the UFC Cog that handles all commands related with ufc
+    """
 
     def __init__(self, bot):
         self.bot = bot
 
     @commands.command()
     async def ufc_card(self, ctx):
+        """
+        A command that sends an embeded view of the next ufc event
+
+        Example in a discord chat:
+
+        Alice> $ufc_card
+        Bot> [embeded view of the next ufc Event]
+        """
 
         event_details = get_event_details(get_latest_event_url())
 
@@ -41,6 +52,16 @@ class UFC(commands.Cog):
 
 
 def get_latest_event_url():
+    """
+    Fetches the next ufc event url from the events page
+
+    Example:
+    >>> get_latest_event_url()
+    'https://www.ufc.com/event/ufc-261'
+
+    :return: The url of the next ufc event
+    """
+
     ufc_url = "https://www.ufc.com"
     ufc_events_url = ufc_url + "/events"
     events_content = requests.get(ufc_events_url, **ufc_request_details()).content
@@ -62,7 +83,17 @@ def get_latest_event_url():
 """
 @lru_cache(maxsize=2)
 def get_event_details(event_url):
+    """
+    Fetches the event page in the event_url and parses the details of the event sutch:
+        name, image, timestamp and main card fights
 
+    Example:
+    >>> get_event_details("https://www.ufc.com/event/ufc-261")
+    {'url': 'https://www.ufc.com/event/ufc-261', 'name': 'UFC 261', 'image': '...', ...}
+
+    :param event_url: The url of an event
+    :return: dictionary with event information
+    """
     event_content = requests.get(event_url, **ufc_request_details()).content
 
     event_page = BeautifulSoup(event_content, 'html.parser')
@@ -79,9 +110,20 @@ def get_event_details(event_url):
 
 
 def ufc_request_details():
+    """
+    Default cookies and headers to get a response from the ufc website
+
+    Example:
+
+    >>> requests.get("http://www.ufc.com", **ufc_request_details())
+    <Response [200]>
+
+    :return: dictionary with two values: cookies and headers
+    """
     cookies = {
         'STYXKEY_region': 'LATIN_AMERICA.PT.en.Default',  # important to get results in english
     }
+
     headers = {
         'authority': 'www.ufc.com',
         'cache-control': 'max-age=0',
@@ -101,6 +143,11 @@ def ufc_request_details():
 
 
 def parse_fights(fights_data):
+    """
+    Extracts information from a list of ufc fights from a given event card
+    :param fights_data:
+    :return:
+    """
     fights = [
         dict(red_fighter=parse_fighter(fight_data.find(class_="c-listing-fight__corner--red")),
              blue_fighter=parse_fighter(fight_data.find(class_="c-listing-fight__corner--blue")),
@@ -112,10 +159,15 @@ def parse_fights(fights_data):
 
 
 def parse_fighter(fighter):
+    """
+    Extracts information of a figter in a given fight
+    :param fighter: fighter data
+    :return:
+    """
     try:
         rank = fighter.select_one(".js-listing-fight__corner-rank > span").contents[0]
     except Exception:
-        rank = "U"
+        rank = "U" #Presents U When the fighter is unranked
 
     return dict(
         first_name=fighter.find(class_="c-listing-fight__corner-given-name").contents[0],
