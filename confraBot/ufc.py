@@ -1,4 +1,5 @@
 import datetime
+from functools import lru_cache
 
 import requests
 from bs4 import BeautifulSoup
@@ -50,12 +51,23 @@ def get_latest_event_url():
     return card_url
 
 
-def get_event_details(card_url):
-    event_content = requests.get(card_url, **ufc_request_details()).content
+"""
+# calling the function without cashing
+# duration of 40 call: 15.1532s
+# duration per call  :  0.3788s
+#
+# calling the function with cashing
+# duration of 40 call:  0.3662s
+# duration per call  :  0.0091s
+"""
+@lru_cache(maxsize=2)
+def get_event_details(event_url):
+
+    event_content = requests.get(event_url, **ufc_request_details()).content
 
     event_page = BeautifulSoup(event_content, 'html.parser')
     result = dict(
-        url=card_url,
+        url=event_url,
         name=event_page.select_one(".field--name-node-title > h1").contents[0].strip(),
         image=event_page.find(class_="c-hero__image")["src"].split("?")[0],
         timestamp=event_page.find(class_="c-event-fight-card-broadcaster__time")["data-timestamp"],
@@ -111,5 +123,19 @@ def parse_fighter(fighter):
         rank=rank,
     )
 
+
 if __name__ == "__main__":
-    pass
+    """
+    Small test to sue the functools lru_cache
+    """
+    from timeit import default_timer as timer
+
+    start = timer()
+    for i in range(40):
+        get_event_details("https://www.ufc.com/event/ufc-fight-night-may-01-2021")
+    end = timer()
+    duration = end - start
+    print(f"duration of 40 call: {duration:2.4f}s\n"
+          f"duration per call  : {duration/40:2.4f}s")
+
+
