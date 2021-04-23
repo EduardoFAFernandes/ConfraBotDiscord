@@ -13,6 +13,7 @@ bot = commands.Bot(command_prefix=BOT_PROMPT)
 bot_cogs = [
     greetings.Greetings,
     utils.Utils
+    # add your cog here
 ]
 
 for cog in bot_cogs:
