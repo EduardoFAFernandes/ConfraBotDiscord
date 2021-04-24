@@ -14,6 +14,7 @@ bot_cogs = [
     greetings.Greetings,
     utils.Utils,
     ufc.UFC
+    # add your cog here
 ]
 
 for cog in bot_cogs:
