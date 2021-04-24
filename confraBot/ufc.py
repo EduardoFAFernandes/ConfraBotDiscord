@@ -1,5 +1,6 @@
 import datetime
 from dataclasses import dataclass
+from typing import List, Dict
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -13,11 +14,11 @@ class UFC(commands.Cog):
     This is the UFC Cog that handles all commands related with ufc
     """
 
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     @commands.command()
-    async def ufc_card(self, ctx):
+    async def ufc_card(self, ctx: commands.Context):
         """
         A command that sends an embeded view of the next ufc event
 
@@ -81,17 +82,11 @@ class Event:
     main_card_fights: List[Fight]
 
 
-async def get_latest_event_url(session):
+async def get_latest_event_url(session: aiohttp.ClientSession) -> str:
     """
     Fetches the next ufc event url from the events page
 
-    Example:
-    >>> import aiohttp
-    >>> async with aiohttp.ClientSession() as session:
-    ...     latest_event_ur = await get_latest_event_url(session)
-    ...
-    'https://www.ufc.com/event/ufc-261'
-
+    :param session: an aiohttp session where the data request will be made
     :return: The url of the next ufc event
     """
 
@@ -107,17 +102,13 @@ async def get_latest_event_url(session):
     return card_url
 
 
-async def get_event_details(event_url, session):
+async def get_event_details(event_url: str, session: aiohttp.ClientSession) -> Event:
     """
-    Fetches the event page in the event_url and parses the details of the event sutch:
-        name, image, timestamp and main card fights
+    Fetches the event page in the event_url and parses the details of the event the result is an Event object.
 
-    Example:
-    >>> get_event_details("https://www.ufc.com/event/ufc-261")
-    {'url': 'https://www.ufc.com/event/ufc-261', 'name': 'UFC 261', 'image': '...', ...}
-
-    :param event_url: The url of an event
-    :return: dictionary with event information
+    :param event_url: The url of a ufc event. Should be somethign like "http://www.ufc.com/events/:event_id"
+    :param session: An aiohttp session where the data request will be made
+    :return: Event object with the associated event information
     """
     async with session.get(event_url, **ufc_request_details()) as response:
         event_content = await response.text()
@@ -128,16 +119,17 @@ async def get_event_details(event_url, session):
         url=event_url,
         name=event_page.select_one(".field--name-node-title > h1").contents[0].strip(),
         image=event_page.find(class_="c-hero__image")["src"].split("?")[0],
-        timestamp=event_page.find(class_="c-event-fight-card-broadcaster__time")["data-timestamp"],
+        timestamp=int(event_page.find(class_="c-event-fight-card-broadcaster__time")["data-timestamp"]),
         main_card_fights=parse_fights(event_page.find(id="edit-group-main-card")
                                       .find_all(class_="c-listing-fight"))
     )
 
 
-
-def ufc_request_details():
+def ufc_request_details() -> Dict[str, Dict[str, str]]:
     """
     Default cookies and headers to get a response from the ufc website
+    The included cookies make the data appear in english.
+    The header information just makes it look like a normal browser making a request.
 
     Example:
     >>> import requests
@@ -168,11 +160,12 @@ def ufc_request_details():
     return dict(cookies=cookies, headers=headers)
 
 
-def parse_fights(fights_data):
+def parse_fights(fights_data: BeautifulSoup) -> List[Fight]:
     """
     Extracts information from a list of ufc fights from a given event card
-    :param fights_data:
-    :return:
+
+    :param fights_data: A BeautifulSoup object with multiple fights inside.
+    :return: A list of fights contained in the fights_data
     """
     fights = [
         Fight(red_fighter=parse_fighter(fight_data.find(class_="c-listing-fight__corner--red")),
@@ -184,11 +177,12 @@ def parse_fights(fights_data):
     return fights
 
 
-def parse_fighter(fighter):
+def parse_fighter(fighter: BeautifulSoup) -> Fighter:
     """
     Extracts information of a figter in a given fight
+
     :param fighter: fighter data
-    :return:
+    :return: A Fighter contained in the figter param
     """
     try:
         rank = fighter.select_one(".js-listing-fight__corner-rank > span").contents[0]
