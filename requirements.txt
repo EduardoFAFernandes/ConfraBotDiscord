@@ -1,2 +1,5 @@
+aiohttp==3.7.4.post0
 discord==1.0.1
 discord.py==1.7.1
+beautifulsoup4==4.9.3
+

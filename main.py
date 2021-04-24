@@ -5,14 +5,15 @@ import random
 from discord.ext import commands
 
 # importing cogs
-from confraBot import greetings, utils
+from confraBot import greetings, utils, ufc
 
 BOT_PROMPT = "$"
 
 bot = commands.Bot(command_prefix=BOT_PROMPT)
 bot_cogs = [
     greetings.Greetings,
-    utils.Utils
+    utils.Utils,
+    ufc.UFC
     # add your cog here
 ]
 
