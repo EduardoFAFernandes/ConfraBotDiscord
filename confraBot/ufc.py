@@ -1,4 +1,5 @@
 import datetime
+from dataclasses import dataclass
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -30,27 +31,54 @@ class UFC(commands.Cog):
             latest_event_url = await get_latest_event_url(session)
             event_details = await get_event_details(latest_event_url, session)
 
-        embed = discord.Embed(title=event_details["name"],
-                              url=event_details["url"],
-                              description=datetime.datetime.fromtimestamp(int(event_details["timestamp"]))
-                                          .strftime("%A %d %B %H:%M"),
+        embed = discord.Embed(title=event_details.name,
+                              url=event_details.url,
+                              description=datetime.datetime.fromtimestamp(event_details.timestamp)
+                              .strftime("%A %d %B %H:%M"),
                               color=0xdedede)
 
-        embed.set_image(url=event_details["image"])
+        embed.set_image(url=event_details.image)
+        embed.set_thumbnail(url="http://pngimg.com/uploads/ufc/ufc_PNG61.png")
 
-        for fight in event_details["main_card_fights"]:
-            red_fighter_description = f"{fight['red_fighter']['rank']} " \
-                                      f"{fight['red_fighter']['first_name']} " \
-                                      f"{fight['red_fighter']['last_name']}"
-            blue_fighter_description = f"{fight['blue_fighter']['rank']} " \
-                                       f"{fight['blue_fighter']['first_name']} " \
-                                       f"{fight['blue_fighter']['last_name']}"
+        for fight in event_details.main_card_fights:
+            red_fighter_description = f"{fight.red_fighter.rank} " \
+                                      f"{fight.red_fighter.first_name} " \
+                                      f"{fight.red_fighter.last_name}"
+            blue_fighter_description = f"{fight.blue_fighter.rank} " \
+                                       f"{fight.blue_fighter.first_name} " \
+                                       f"{fight.blue_fighter.last_name}"
             fight_description = f"{red_fighter_description} vs. {blue_fighter_description}"
             embed.add_field(name=fight_description,
-                            value=fight["fight_class"],
+                            value=fight.fight_class,
                             inline=False)
 
         await ctx.send(embed=embed)
+
+
+@dataclass
+class Fighter:
+    """Class to store data from a fighter."""
+    first_name: str
+    last_name: str
+    rank: str
+
+
+@dataclass
+class Fight:
+    """Class to store data from a fight."""
+    red_fighter: Fighter
+    blue_fighter: Fighter
+    fight_class: str
+
+
+@dataclass
+class Event:
+    """Class to store data fom a fight"""
+    url: str
+    name: str
+    image: str
+    timestamp: int
+    main_card_fights: List[Fight]
 
 
 async def get_latest_event_url(session):
@@ -95,7 +123,8 @@ async def get_event_details(event_url, session):
         event_content = await response.text()
 
     event_page = BeautifulSoup(event_content, 'html.parser')
-    result = dict(
+
+    return Event(
         url=event_url,
         name=event_page.select_one(".field--name-node-title > h1").contents[0].strip(),
         image=event_page.find(class_="c-hero__image")["src"].split("?")[0],
@@ -104,7 +133,6 @@ async def get_event_details(event_url, session):
                                       .find_all(class_="c-listing-fight"))
     )
 
-    return result
 
 
 def ufc_request_details():
@@ -147,9 +175,9 @@ def parse_fights(fights_data):
     :return:
     """
     fights = [
-        dict(red_fighter=parse_fighter(fight_data.find(class_="c-listing-fight__corner--red")),
-             blue_fighter=parse_fighter(fight_data.find(class_="c-listing-fight__corner--blue")),
-             fight_class=fight_data.find(class_="c-listing-fight__class").contents[0])
+        Fight(red_fighter=parse_fighter(fight_data.find(class_="c-listing-fight__corner--red")),
+              blue_fighter=parse_fighter(fight_data.find(class_="c-listing-fight__corner--blue")),
+              fight_class=fight_data.find(class_="c-listing-fight__class").contents[0])
         for fight_data in fights_data
     ]
 
@@ -165,29 +193,30 @@ def parse_fighter(fighter):
     try:
         rank = fighter.select_one(".js-listing-fight__corner-rank > span").contents[0]
     except Exception:
-        rank = "U" #Presents U When the fighter is unranked
+        rank = "U"  # Presents U When the fighter is unranked
 
-    return dict(
-        first_name=fighter.find(class_="c-listing-fight__corner-given-name").contents[0],
-        last_name=fighter.find(class_="c-listing-fight__corner-family-name").contents[0],
-        rank=rank,
-    )
+    return Fighter(first_name=fighter.find(class_="c-listing-fight__corner-given-name").contents[0],
+                   last_name=fighter.find(class_="c-listing-fight__corner-family-name").contents[0],
+                   rank=rank)
 
 
 async def main():
     """
-    Small test to sue the functools lru_cache
+    Small test to the module
     """
     from timeit import default_timer as timer
 
     start = timer()
 
-    async with aiohttp.ClientSession() as session:
-        get_event_details("https://www.ufc.com/event/ufc-fight-night-may-01-2021", session)
+    async with aiohttp.ClientSession(**ufc_request_details()) as session:
+        latest_event_url = await get_latest_event_url(session)
+        event_details = await get_event_details(latest_event_url, session)
 
     end = timer()
     duration = end - start
-    print(f"duration per call  : {duration / 40:2.4f}s")
+
+    print(event_details)
+    print(f"duration  : {duration / 40:2.4f}s")
 
 
 if __name__ == "__main__":
@@ -195,6 +224,3 @@ if __name__ == "__main__":
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main())
-
-
-
