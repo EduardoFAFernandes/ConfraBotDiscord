@@ -1,7 +1,6 @@
 import datetime
-from functools import lru_cache
 
-import requests
+import aiohttp
 from bs4 import BeautifulSoup
 
 import discord
@@ -27,7 +26,9 @@ class UFC(commands.Cog):
         Bot> [embeded view of the next ufc Event]
         """
 
-        event_details = get_event_details(get_latest_event_url())
+        async with aiohttp.ClientSession(**ufc_request_details()) as session:
+            latest_event_url = await get_latest_event_url(session)
+            event_details = await get_event_details(latest_event_url, session)
 
         embed = discord.Embed(title=event_details["name"],
                               url=event_details["url"],
@@ -48,15 +49,19 @@ class UFC(commands.Cog):
             embed.add_field(name=fight_description,
                             value=fight["fight_class"],
                             inline=False)
+
         await ctx.send(embed=embed)
 
 
-def get_latest_event_url():
+async def get_latest_event_url(session):
     """
     Fetches the next ufc event url from the events page
 
     Example:
-    >>> get_latest_event_url()
+    >>> import aiohttp
+    >>> async with aiohttp.ClientSession() as session:
+    ...     latest_event_ur = await get_latest_event_url(session)
+    ...
     'https://www.ufc.com/event/ufc-261'
 
     :return: The url of the next ufc event
@@ -64,7 +69,9 @@ def get_latest_event_url():
 
     ufc_url = "https://www.ufc.com"
     ufc_events_url = ufc_url + "/events"
-    events_content = requests.get(ufc_events_url, **ufc_request_details()).content
+    async with session.get(ufc_events_url, **ufc_request_details()) as response:
+        events_content = await response.text()
+
     card_path = BeautifulSoup(events_content, 'html.parser') \
         .find(class_="c-card-event--result__logo") \
         .find("a")["href"]
@@ -72,17 +79,7 @@ def get_latest_event_url():
     return card_url
 
 
-"""
-# calling the function without cashing
-# duration of 40 call: 15.1532s
-# duration per call  :  0.3788s
-#
-# calling the function with cashing
-# duration of 40 call:  0.3662s
-# duration per call  :  0.0091s
-"""
-@lru_cache(maxsize=2)
-def get_event_details(event_url):
+async def get_event_details(event_url, session):
     """
     Fetches the event page in the event_url and parses the details of the event sutch:
         name, image, timestamp and main card fights
@@ -94,7 +91,8 @@ def get_event_details(event_url):
     :param event_url: The url of an event
     :return: dictionary with event information
     """
-    event_content = requests.get(event_url, **ufc_request_details()).content
+    async with session.get(event_url, **ufc_request_details()) as response:
+        event_content = await response.text()
 
     event_page = BeautifulSoup(event_content, 'html.parser')
     result = dict(
@@ -114,7 +112,7 @@ def ufc_request_details():
     Default cookies and headers to get a response from the ufc website
 
     Example:
-
+    >>> import requests
     >>> requests.get("http://www.ufc.com", **ufc_request_details())
     <Response [200]>
 
@@ -176,18 +174,27 @@ def parse_fighter(fighter):
     )
 
 
-if __name__ == "__main__":
+async def main():
     """
     Small test to sue the functools lru_cache
     """
     from timeit import default_timer as timer
 
     start = timer()
-    for i in range(40):
-        get_event_details("https://www.ufc.com/event/ufc-fight-night-may-01-2021")
+
+    async with aiohttp.ClientSession() as session:
+        get_event_details("https://www.ufc.com/event/ufc-fight-night-may-01-2021", session)
+
     end = timer()
     duration = end - start
-    print(f"duration of 40 call: {duration:2.4f}s\n"
-          f"duration per call  : {duration/40:2.4f}s")
+    print(f"duration per call  : {duration / 40:2.4f}s")
+
+
+if __name__ == "__main__":
+    import asyncio
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())
+
 
 
