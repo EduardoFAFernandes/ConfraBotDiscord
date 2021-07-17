@@ -1,12 +1,13 @@
-import datetime
 from dataclasses import dataclass
 from typing import List, Dict
+from enum import Enum
 
 import aiohttp
 from bs4 import BeautifulSoup
 
 import discord
 from discord.ext import commands
+from confraBot.utils import embed_pages
 
 
 class UFC(commands.Cog):
@@ -32,28 +33,11 @@ class UFC(commands.Cog):
             latest_event_url = await get_latest_event_url(session)
             event_details = await get_event_details(latest_event_url, session)
 
-        embed = discord.Embed(title=event_details.name,
-                              url=event_details.url,
-                              description=datetime.datetime.fromtimestamp(event_details.timestamp)
-                              .strftime("%A %d %B %H:%M"),
-                              color=0xdedede)
-
-        embed.set_image(url=event_details.image)
-        embed.set_thumbnail(url="http://pngimg.com/uploads/ufc/ufc_PNG61.png")
-
-        for fight in event_details.main_card_fights:
-            red_fighter_description = f"{fight.red_fighter.rank} " \
-                                      f"{fight.red_fighter.first_name} " \
-                                      f"{fight.red_fighter.last_name}"
-            blue_fighter_description = f"{fight.blue_fighter.rank} " \
-                                       f"{fight.blue_fighter.first_name} " \
-                                       f"{fight.blue_fighter.last_name}"
-            fight_description = f"{red_fighter_description} vs. {blue_fighter_description}"
-            embed.add_field(name=fight_description,
-                            value=fight.fight_class,
-                            inline=False)
-
-        await ctx.send(embed=embed)
+        await embed_pages(self.bot, ctx,
+                          pages=[gen_card_embed(event_details, card_type)
+                                 for card_type in Cards
+                                 if card_type.get_card(event_details) is not None
+                                 ])
 
 
 @dataclass
@@ -73,13 +57,68 @@ class Fight:
 
 
 @dataclass
+class FightCard:
+    """Class to store data fom a fight card"""
+    timestamp: int
+    card_fights: List[Fight]
+
+
+@dataclass
 class Event:
-    """Class to store data fom a fight"""
+    """Class to store data fom a UFC Event"""
     url: str
     name: str
     image: str
-    timestamp: int
-    main_card_fights: List[Fight]
+    main_card: FightCard
+    prelims_card: FightCard
+    prelims_early_card: FightCard
+
+
+class Cards(Enum):
+    MAIN_CARD = (1, "Main Card", "main_card")
+    PRELIMS = (2, "Prelims", "prelims_card")
+    EARLY_PRELIMS = (3, "Early Prelims", "prelims_early_card")
+
+    def __init__(self, num, name_str, attr_name):
+        self.num = num
+        self.name_str = name_str
+        self.attr_name = attr_name
+
+    def __str__(self):
+        return self.name_str
+
+    def get_card(self, event):
+        return event.__getattribute__(self.attr_name)
+
+
+def gen_card_embed(event_details, card_type):
+    card = card_type.get_card(event_details)
+
+    embed = discord.Embed(title=f"{event_details.name} - {card_type}",
+                          url=event_details.url,
+                          description=f"<t:{card.timestamp}:F>\n<t:{card.timestamp}:R>",
+                          color=0xdedede)
+
+    embed.set_image(url=event_details.image)
+    embed.set_thumbnail(url="http://pngimg.com/uploads/ufc/ufc_PNG61.png")
+
+    current_page = card_type.num
+    total_pages = 2 if event_details.prelims_early_card is None else 3
+    embed.set_footer(text=f"{current_page}/{total_pages}")
+
+    for fight in card.card_fights:
+        red_fighter_description = f"{fight.red_fighter.rank} " \
+                                  f"{fight.red_fighter.first_name} " \
+                                  f"{fight.red_fighter.last_name}"
+        blue_fighter_description = f"{fight.blue_fighter.rank} " \
+                                   f"{fight.blue_fighter.first_name} " \
+                                   f"{fight.blue_fighter.last_name}"
+        fight_description = f"{red_fighter_description} vs. {blue_fighter_description}"
+        embed.add_field(name=fight_description,
+                        value=fight.fight_class,
+                        inline=False)
+
+    return embed
 
 
 async def get_latest_event_url(session: aiohttp.ClientSession) -> str:
@@ -119,9 +158,10 @@ async def get_event_details(event_url: str, session: aiohttp.ClientSession) -> E
         url=event_url,
         name=event_page.select_one(".field--name-node-title > h1").contents[0].strip(),
         image=event_page.find(class_="c-hero__image")["src"].split("?")[0],
-        timestamp=int(event_page.find(class_="c-event-fight-card-broadcaster__time")["data-timestamp"]),
-        main_card_fights=parse_fights(event_page.find(id="edit-group-main-card")
-                                      .find_all(class_="c-listing-fight"))
+        main_card=parse_card(event_page.find(class_="main-card")),
+        prelims_card=parse_card(event_page.find(class_="fight-card-prelims")),
+        prelims_early_card=parse_card(event_page.find(class_="fight-card-prelims-early"))
+
     )
 
 
@@ -158,6 +198,18 @@ def ufc_request_details() -> Dict[str, Dict[str, str]]:
         'accept-language': 'pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7',
     }
     return dict(cookies=cookies, headers=headers)
+
+
+def parse_card(card_page: BeautifulSoup) -> FightCard:
+    timestamp_elem = card_page.find(class_="c-event-fight-card-broadcaster__time")
+
+    if timestamp_elem is None:
+        return None
+
+    return FightCard(
+        timestamp=int(timestamp_elem["data-timestamp"]),
+        card_fights=parse_fights(card_page.find_all(class_="c-listing-fight"))
+    )
 
 
 def parse_fights(fights_data: BeautifulSoup) -> List[Fight]:
