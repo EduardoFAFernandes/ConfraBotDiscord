@@ -1,5 +1,7 @@
 import random
 
+from asyncio import TimeoutError
+
 import discord
 from discord.ext import commands
 
@@ -11,11 +13,11 @@ VALID_HTTP_CODES = [100, 101, 102, 200, 201, 202, 204, 206, 207, 300, 301, 302, 
 
 VALID_HTTP_CODES_SET = set(VALID_HTTP_CODES)
 
+
 class Utils(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-
 
     @commands.command()
     async def roll(self, ctx, dice: str):
@@ -28,7 +30,6 @@ class Utils(commands.Cog):
 
         result = ', '.join(str(random.randint(1, limit)) for r in range(rolls))
         await ctx.send(result)
-
 
     @commands.command()
     async def http_cat(self, ctx, http_code: int = None):
@@ -44,22 +45,57 @@ class Utils(commands.Cog):
         embed.set_image(url=f"https://http.cat/{http_code}.jpg")
         await ctx.send(embed=embed)
 
+    @commands.command()
+    async def embedpages_cmd(self, ctx):
+        """Example of embed_pages """
+        page1 = discord.Embed(
+            title='Page 1/3',
+            description='Description for page number one.',
+            colour=discord.Colour.orange()
+        )
+        page2 = discord.Embed(
+            title='Page 2/3',
+            description='Description of the second page.',
+            colour=discord.Colour.orange()
+        )
+        page3 = discord.Embed(
+            title='Page 3/3',
+            description='Description of the third and final page',
+            colour=discord.Colour.orange()
+        )
 
-    async def random_user(self, ctx):
-        commands.context
-        discord.Member.voice
-        ctx.author
-
-def main():
-    import requests
-    for http_code in VALID_HTTP_CODES:
-        response = requests.get(f"https://http.cat/{http_code}.jpg")
-
-        if response.status_code == 200:
-            continue
-
-        print(http_code.value)
+        pages = [page1, page2, page3]
+        await embed_pages(self.bot, ctx, pages)
 
 
-if __name__ == "__main__":
-    main()
+async def embed_pages(bot, ctx, pages, timeout=30.0):
+    pages_idx_last = len(pages) - 1
+
+    message = await ctx.send(embed=pages[0])
+
+    controls = {
+        '⏮': lambda idx: 0,
+        '◀': lambda idx: max(pages_idx - 1, 0),
+        '▶': lambda idx: min(pages_idx + 1, pages_idx_last),
+        '⏭': lambda idx: pages_idx_last
+    }
+
+    for emoji in controls.keys():
+        await message.add_reaction(emoji)
+
+    pages_idx = 0
+
+    while True:
+        try:
+            emoji, user = await bot.wait_for('reaction_add',
+                                             timeout=timeout,
+                                             check=lambda reaction, user: user == ctx.author and reaction.message == message) # only author can
+        except TimeoutError:
+            break
+
+        await message.remove_reaction(emoji, user)
+
+        pages_idx = controls.get(str(emoji))(pages_idx)  # updating the pages_idx according to the selected emoji
+        await message.edit(embed=pages[pages_idx])
+
+    await message.clear_reactions()
