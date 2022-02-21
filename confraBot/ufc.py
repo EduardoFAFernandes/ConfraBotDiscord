@@ -157,7 +157,7 @@ async def get_event_details(event_url: str, session: aiohttp.ClientSession) -> E
     return Event(
         url=event_url,
         name=event_page.select_one(".field--name-node-title > h1").contents[0].strip(),
-        image=event_page.find(class_="c-hero__image")["src"].split("?")[0],
+        image=event_page.find(class_="c-hero")["style"][22:-1],
         main_card=parse_card(event_page.find(class_="main-card")),
         prelims_card=parse_card(event_page.find(class_="fight-card-prelims")),
         prelims_early_card=parse_card(event_page.find(class_="fight-card-prelims-early"))
