@@ -219,6 +219,7 @@ def parse_fights(fights_data: BeautifulSoup) -> List[Fight]:
     :param fights_data: A BeautifulSoup object with multiple fights inside.
     :return: A list of fights contained in the fights_data
     """
+
     fights = [
         Fight(red_fighter=parse_fighter(fight_data.find(class_="c-listing-fight__corner--red")),
               blue_fighter=parse_fighter(fight_data.find(class_="c-listing-fight__corner--blue")),
@@ -236,15 +237,27 @@ def parse_fighter(fighter: BeautifulSoup) -> Fighter:
     :param fighter: fighter data
     :return: A Fighter contained in the figter param
     """
-    try:
-        rank = fighter.select_one(".js-listing-fight__corner-rank > span").contents[0]
-    except Exception:
+
+    rank_div = fighter.select_one(".js-listing-fight__corner-rank > span")
+    
+    if rank_div is not None:
+        rank = rank_div.contents[0]
+    else:
         rank = "U"  # Presents U When the fighter is unranked
 
-    return Fighter(first_name=fighter.find(class_="c-listing-fight__corner-given-name").contents[0],
-                   last_name=fighter.find(class_="c-listing-fight__corner-family-name").contents[0],
-                   rank=rank)
 
+    first_name_div = fighter.find(class_="c-listing-fight__corner-given-name")
+    last_name_div = fighter.find(class_="c-listing-fight__corner-family-name")
+    
+    if first_name_div is not None and last_name_div is not None:
+        first_name=first_name_div.contents[0]
+        last_name=last_name_div.contents[0]
+    else: 
+        first_name, last_name = fighter.find(class_="c-listing-fight__corner-name").contents[0].split()
+
+    return Fighter(first_name=first_name,
+                   last_name=last_name,
+                   rank=rank)
 
 async def main():
     """
